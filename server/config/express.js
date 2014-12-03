@@ -18,9 +18,41 @@ var passport = require('passport');
 var session = require('express-session');
 var mongoStore = require('connect-mongo')(session);
 var mongoose = require('mongoose');
+var multer  = require('multer');
+var fs = require('fs');
 
 module.exports = function(app) {
   var env = app.get('env');
+
+  var uploadDir = config.root + '/uploads';
+  var imageDir = uploadDir + '/images';
+
+  app.use(multer({
+    dest: uploadDir,
+    onFileUploadStart: function (file) {
+      if (file.fieldname !== 'payload') return false;
+    },
+    onFileUploadComplete: function (file) {
+
+      var images = ['image/jpeg'];
+      if(_.contains(images, file.mimetype)){
+        var target = imageDir + '/'  + file.name;
+        var tmp = file.path;
+        fs.rename(tmp, target, function(err){
+          if (err) {
+            console.log(err);
+            new Error(err);
+          }
+        });
+        //console.log(file.fieldname + ' uploaded to  ' + file.path)
+      }
+    }
+  }));
+
+  if (!fs.existsSync(imageDir)) {
+    fs.mkdirSync(imageDir);
+  }
+
 
   app.set('views', config.root + '/server/views');
   app.engine('html', require('ejs').renderFile);
@@ -40,7 +72,7 @@ module.exports = function(app) {
     saveUninitialized: true,
     store: new mongoStore({ mongoose_connection: mongoose.connection })
   }));
-  
+
   if ('production' === env) {
     app.use(favicon(path.join(config.root, 'public', 'favicon.ico')));
     app.use(express.static(path.join(config.root, 'public')));
